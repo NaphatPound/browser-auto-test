@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Auto-Test Recorder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Auto-Test Recorder</h1>
+      <span id="status" class="status idle">Idle</span>
+    </header>
+
+    <section class="controls">
+      <button id="btn-start" class="btn primary">● Start</button>
+      <button id="btn-stop" class="btn" disabled>■ Stop</button>
+      <button id="btn-clear" class="btn">Clear</button>
+      <button id="btn-download" class="btn">Download JSON</button>
+    </section>
+
+    <section class="steps">
+      <h2>Steps <span id="step-count">(0)</span></h2>
+      <ol id="step-list"></ol>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

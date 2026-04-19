@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Auto-Test Recorder",
+  "version": "0.1.0",
+  "description": "Record browser interactions and export them as a TestSuite JSON (compatible with browser-auto-test).",
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "webNavigation", "downloads"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Auto-Test Recorder"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

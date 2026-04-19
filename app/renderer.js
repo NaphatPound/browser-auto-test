@@ -12,6 +12,8 @@ const btnStop = document.getElementById('btn-stop');
 const btnReplay = document.getElementById('btn-replay');
 const btnClear = document.getElementById('btn-clear');
 const btnExportJson = document.getElementById('btn-export-json');
+const btnOpenJson = document.getElementById('btn-open-json');
+const fileInput = document.getElementById('file-input');
 const speedSel = document.getElementById('speed');
 const autoWaitToggle = document.getElementById('auto-wait');
 const autoWaitSec = document.getElementById('auto-wait-sec');
@@ -720,6 +722,107 @@ function waitForLoad() {
   });
 }
 
+// ---------- Save / Open / Auto-persist ----------
+const PERSIST_KEY = 'autoTestRecorder.lastSuite.v1';
+
+function persist() {
+  try {
+    const payload = {
+      name: 'recorded flow',
+      baseUrl: state.baseUrl,
+      steps: state.steps,
+      stepCounter: state.stepCounter,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // localStorage can throw on quota exceeded — degrade gracefully.
+    console.warn('persist failed:', e && e.message);
+  }
+}
+
+function validateSuite(suite) {
+  if (!suite || typeof suite !== 'object') return 'not an object';
+  if (!Array.isArray(suite.steps)) return 'missing steps[]';
+  for (const s of suite.steps) {
+    if (!s || typeof s !== 'object') return 'step is not an object';
+    if (typeof s.type !== 'string') return 'step.type missing';
+  }
+  return null;
+}
+
+function loadSuite(suite, source) {
+  const err = validateSuite(suite);
+  if (err) {
+    logEntry('err', `Load failed: ${err}`);
+    setStatus('idle', `Load failed: ${err}`);
+    return false;
+  }
+  state.steps = suite.steps.map((s, i) => ({
+    ...s,
+    id: s.id || `step_${Date.now()}_${i + 1}`,
+  }));
+  state.baseUrl = suite.baseUrl || state.baseUrl;
+  state.stepCounter = Math.max(state.stepCounter, state.steps.length);
+  render();
+  updateCode();
+  persist();
+  const label = source ? ` from ${source}` : '';
+  logEntry('info', `Loaded ${state.steps.length} step(s)${label}`);
+  setStatus('idle', `Loaded ${state.steps.length} step(s)${label}`);
+  return true;
+}
+
+// Wrap render()/updateCode() so any state mutation also persists.
+const _origRender = render;
+render = function () {
+  _origRender();
+  persist();
+};
+
+if (btnOpenJson && fileInput) {
+  btnOpenJson.addEventListener('click', () => {
+    if (state.steps.length > 0) {
+      const ok = window.confirm('Loading will replace the current recording. Continue?');
+      if (!ok) return;
+    }
+    fileInput.value = '';
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const suite = JSON.parse(text);
+      loadSuite(suite, file.name);
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      logEntry('err', `Open failed: ${msg}`);
+      setStatus('idle', `Open failed: ${msg}`);
+    }
+  });
+}
+
 // ---------- Initial render ----------
 render();
 updateCode();
+
+// Rehydrate from the last session if the user didn't explicitly clear.
+(function rehydrate() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return;
+    const payload = JSON.parse(raw);
+    if (!payload || !Array.isArray(payload.steps) || payload.steps.length === 0) return;
+    state.steps = payload.steps;
+    if (payload.baseUrl) state.baseUrl = payload.baseUrl;
+    if (Number.isFinite(payload.stepCounter)) state.stepCounter = payload.stepCounter;
+    render();
+    updateCode();
+    const when = payload.savedAt ? ` (saved ${payload.savedAt})` : '';
+    logEntry('info', `Restored ${state.steps.length} step(s) from last session${when}`);
+  } catch (e) {
+    console.warn('rehydrate failed:', e && e.message);
+  }
+})();
