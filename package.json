@@ -1,0 +1,35 @@
+{
+  "name": "browser-auto-test",
+  "version": "0.1.0",
+  "description": "Customizable Auto-Test Browser - core engine (recorder, smart locator, code generator)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "auto-test": "dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "tsx src/demo.ts",
+    "app": "electron app/main.cjs"
+  },
+  "keywords": [
+    "playwright",
+    "puppeteer",
+    "cypress",
+    "test-recorder",
+    "codegen"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jsdom": "^21.1.6",
+    "@types/node": "^20.11.0",
+    "electron": "^31.7.7",
+    "jsdom": "^24.0.0",
+    "mermaid": "^10.9.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Auto-Test Browser</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="panel">
+        <header class="panel-header">
+          <h1>Auto-Test Browser</h1>
+        </header>
+
+        <section class="controls">
+          <div class="row">
+            <button id="btn-record" class="btn primary">● Record</button>
+            <button id="btn-stop" class="btn" disabled>■ Stop</button>
+            <button id="btn-replay" class="btn">▶ Replay</button>
+            <button id="btn-clear" class="btn danger">Clear</button>
+            <button id="btn-export-json" class="btn">Export JSON</button>
+          </div>
+          <div class="row">
+            <label>Speed
+              <select id="speed">
+                <option value="1500">Slow</option>
+                <option value="800" selected>Normal</option>
+                <option value="300">Fast</option>
+              </select>
+            </label>
+            <label class="auto-wait">
+              <input id="auto-wait" type="checkbox" checked />
+              Auto-wait
+              <input id="auto-wait-sec" type="number" min="0" step="0.5" value="5" />s
+            </label>
+            <span id="status" class="status idle">Idle</span>
+          </div>
+        </section>
+
+        <section class="steps">
+          <h2>Recorded Steps <span id="step-count">(0)</span></h2>
+          <ol id="step-list"></ol>
+        </section>
+
+        <section class="codegen">
+          <div class="tabs">
+            <button class="tab active" data-fw="playwright">Playwright</button>
+            <button class="tab" data-fw="cypress">Cypress</button>
+            <button class="tab" data-fw="puppeteer">Puppeteer</button>
+            <button class="tab" data-fw="mermaid">Flowchart</button>
+          </div>
+          <textarea id="code" readonly spellcheck="false"></textarea>
+          <div id="diagram" class="diagram" hidden></div>
+        </section>
+
+        <section class="log-section">
+          <div class="log-header">
+            <h2>Replay Log</h2>
+            <button id="btn-log-clear" class="btn" type="button">Clear</button>
+          </div>
+          <ol id="log-list" class="log-list"></ol>
+        </section>
+      </aside>
+
+      <main id="browser">
+        <div class="urlbar">
+          <button id="btn-back" class="nav">◀</button>
+          <button id="btn-forward" class="nav">▶</button>
+          <button id="btn-reload" class="nav">⟳</button>
+          <form id="url-form">
+            <input id="url" type="text" value="https://example.com" spellcheck="false" />
+          </form>
+          <button id="btn-go" class="nav">Go</button>
+        </div>
+        <webview
+          id="wv"
+          src="https://example.com"
+          preload="./webview-preload.cjs"
+          allowpopups
+        ></webview>
+      </main>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

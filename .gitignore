@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.ralph/
+.rtk/
+.report.json
+*.log
+.DS_Store
+.env
+.env.local
+coverage/
+.vscode/
+.idea/
