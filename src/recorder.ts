@@ -42,7 +42,7 @@ export class Recorder {
 
   /** Capture a DOM event into a step. */
   capture(
-    type: Exclude<StepType, 'navigate' | 'wait'>,
+    type: Exclude<StepType, 'navigate' | 'wait' | 'comment'>,
     target: LocatorCandidate,
     extra: { text?: string; key?: string; selectValue?: string } = {},
   ): void {

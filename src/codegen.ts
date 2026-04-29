@@ -4,6 +4,10 @@ import { toCssSelector, toPlaywrightSelector, xpathLiteral } from './locator.js'
 const q = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
 const isTextLoc = (step: Step): boolean => step.locator?.strategy === 'text';
+const noteLine = (step: Step): string => {
+  const target = step.locator ? ` on ${step.locator.strategy}=${step.locator.value}` : '';
+  return `  // Comment${target}: ${(step.note ?? '').replace(/\r?\n/g, ' ').trim()}`;
+};
 
 function playwrightStep(step: Step): string {
   const sel = step.locator ? toPlaywrightSelector(step.locator) : '';
@@ -26,6 +30,8 @@ function playwrightStep(step: Step): string {
       return `  await page.selectOption(${q(sel)}, ${q(step.selectValue ?? '')});`;
     case 'wait':
       return `  await page.waitForTimeout(${step.timeoutMs ?? 1000});`;
+    case 'comment':
+      return noteLine(step);
     case 'assertText':
       return `  await expect(page.locator(${q(sel)})).toHaveText(${q(step.text ?? '')});`;
     case 'assertVisible':
@@ -70,6 +76,8 @@ function puppeteerStep(step: Step): string {
           step,
           `    await _el.evaluate((n, v) => { n.value = v; n.dispatchEvent(new Event('change', { bubbles: true })); }, ${q(step.selectValue ?? '')});`,
         );
+      case 'comment':
+        return noteLine(step);
       case 'assertText':
         return puppeteerTextBlock(
           step,
@@ -102,6 +110,8 @@ function puppeteerStep(step: Step): string {
       return `  await page.select(${q(sel ?? '')}, ${q(step.selectValue ?? '')});`;
     case 'wait':
       return `  await new Promise(r => setTimeout(r, ${step.timeoutMs ?? 1000}));`;
+    case 'comment':
+      return noteLine(step);
     case 'assertText': {
       return `  {
     const _t = await page.$eval(${q(sel ?? '')}, el => el.textContent);
@@ -139,6 +149,8 @@ function cypressStep(step: Step): string {
       return `  ${head}.select(${q(step.selectValue ?? '')});`;
     case 'wait':
       return `  cy.wait(${step.timeoutMs ?? 1000});`;
+    case 'comment':
+      return noteLine(step);
     case 'assertText':
       return `  ${head}.should('have.text', ${q(step.text ?? '')});`;
     case 'assertVisible':

@@ -18,12 +18,26 @@
             <button id="btn-record" class="btn primary">● Record</button>
             <button id="btn-stop" class="btn" disabled>■ Stop</button>
             <button id="btn-replay" class="btn">▶ Replay</button>
+            <button id="btn-comment-element" class="btn">Comment Element</button>
             <button id="btn-clear" class="btn danger">Clear</button>
           </div>
           <div class="row">
             <button id="btn-export-json" class="btn">Export JSON</button>
             <button id="btn-open-json" class="btn">Open JSON</button>
+            <button id="btn-preview-report" class="btn" disabled>Preview Report</button>
+            <button id="btn-export-report" class="btn" disabled>Export Report</button>
+            <button id="btn-sessions" class="btn">Sessions</button>
             <input id="file-input" type="file" accept=".json,application/json" hidden />
+          </div>
+          <div id="comment-prompt" class="comment-prompt" hidden>
+            <div class="comment-prompt-label">
+              Comment for <span id="comment-prompt-target">selected element</span>
+            </div>
+            <div class="row">
+              <input id="comment-prompt-input" type="text" placeholder="Type a comment and press Enter" />
+              <button id="btn-comment-save" class="btn primary" type="button">Save</button>
+              <button id="btn-comment-skip" class="btn" type="button">Skip</button>
+            </div>
           </div>
           <div class="row">
             <label>Speed
@@ -67,8 +81,11 @@
         </section>
       </aside>
 
+      <div id="panel-resizer" class="panel-resizer" title="Drag to resize panel"></div>
+
       <main id="browser">
         <div class="urlbar">
+          <button id="btn-toggle-panel" class="nav nav-toggle" title="Hide/Show left panel">◀ Hide</button>
           <button id="btn-back" class="nav">◀</button>
           <button id="btn-forward" class="nav">▶</button>
           <button id="btn-reload" class="nav">⟳</button>
@@ -76,6 +93,7 @@
             <input id="url" type="text" value="https://example.com" spellcheck="false" />
           </form>
           <button id="btn-go" class="nav">Go</button>
+          <button id="btn-devtools" class="nav" title="Open DevTools (F12)">F12</button>
         </div>
         <webview
           id="wv"
@@ -86,6 +104,52 @@
       </main>
     </div>
 
-    <script src="renderer.js"></script>
+    <div id="sessions-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card">
+        <header class="modal-header">
+          <h2>Saved Sessions</h2>
+          <button class="modal-close" data-close type="button">×</button>
+        </header>
+        <div class="modal-body modal-body-light">
+          <div class="sessions-settings">
+            <label class="settings-row">
+              <input id="setting-new-per-recording" type="checkbox" />
+              <span>Start a new report each time I click Record (auto-archive on Stop)</span>
+            </label>
+            <p class="settings-hint">Off: keep adding to one accumulating report. On: every Record→Stop becomes its own saved session and report.md.</p>
+          </div>
+          <div class="sessions-toolbar">
+            <button id="btn-session-new" class="btn" type="button">+ New Session</button>
+            <button id="btn-session-save-now" class="btn" type="button">Save Current as Session</button>
+            <span class="modal-spacer"></span>
+            <button id="btn-session-export-combined" class="btn" type="button" disabled>Export Combined report.md</button>
+          </div>
+          <ol id="sessions-list" class="sessions-list"></ol>
+          <p id="sessions-empty" class="sessions-empty">No saved sessions yet. Records become sessions automatically when you click Stop (with the setting above turned on), or click "Save Current as Session" any time.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="report-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card">
+        <header class="modal-header">
+          <h2>Report Preview</h2>
+          <button class="modal-close" data-close type="button">×</button>
+        </header>
+        <div class="modal-body">
+          <pre id="report-preview"></pre>
+        </div>
+        <footer class="modal-footer">
+          <span id="report-preview-meta" class="modal-meta"></span>
+          <span class="modal-spacer"></span>
+          <button id="btn-report-copy" class="btn" type="button">Copy</button>
+          <button id="btn-report-download" class="btn primary" type="button">Download report.md</button>
+        </footer>
+      </div>
+    </div>
+
+    <script type="module" src="renderer.js"></script>
   </body>
 </html>

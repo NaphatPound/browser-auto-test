@@ -8,6 +8,7 @@ export type StepType =
   | 'uncheck'
   | 'select'
   | 'wait'
+  | 'comment'
   | 'assertText'
   | 'assertVisible';
 
@@ -25,11 +26,13 @@ export interface Step {
   key?: string;
   timeoutMs?: number;
   selectValue?: string;
+  note?: string;
 }
 
 export interface TestSuite {
   name: string;
   baseUrl?: string;
+  summary?: string;
   steps: Step[];
   createdAt: string;
 }

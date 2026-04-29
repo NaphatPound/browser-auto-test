@@ -68,6 +68,8 @@ function getStepLabel(step: Step): string {
     detail = `: ${step.url}`;
   } else if (step.type === 'wait') {
     detail = `: ${step.timeoutMs}ms`;
+  } else if (step.type === 'comment') {
+    detail = step.note ? `: ${step.note}` : ': note';
   }
 
   let value = '';
@@ -77,6 +79,8 @@ function getStepLabel(step: Step): string {
     value = ` ('${step.selectValue}')`;
   } else if (step.key) {
     value = ` [${step.key}]`;
+  } else if (step.type === 'comment' && step.locator) {
+    value = ` [${step.locator.strategy}=${step.locator.value}]`;
   }
 
   return sanitizeMermaidLabel(`${type}${detail}${value}`);
@@ -96,6 +100,8 @@ function getStepShape(step: Step): { open: string; close: string } {
       return { open: '{', close: '}' }; // Decision/Assertion
     case 'wait':
       return { open: '((', close: '))' }; // Event
+    case 'comment':
+      return { open: '[/', close: '/]' }; // Annotation
     default:
       return { open: '[', close: ']' };
   }

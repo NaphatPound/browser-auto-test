@@ -80,6 +80,25 @@ describe('Code generation', () => {
     expect(out).toContain("test('login flow'");
   });
 
+  it('renders comment steps as source comments instead of executable actions', () => {
+    const suite: TestSuite = {
+      name: 'annotated',
+      createdAt: '2026-04-17T00:00:00.000Z',
+      steps: [
+        { id: '1', type: 'navigate', url: 'https://example.com' },
+        {
+          id: '2',
+          type: 'comment',
+          locator: { strategy: 'id', value: 'submit' },
+          note: 'Expected a validation banner here',
+        },
+      ],
+    };
+    const out = generate(suite, 'playwright');
+    expect(out).toContain('// Comment on id=submit: Expected a validation banner here');
+    expect(out).not.toContain('page.comment');
+  });
+
   describe('text locators', () => {
     const textSuite: TestSuite = {
       name: 'text flow',

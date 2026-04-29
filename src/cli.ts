@@ -302,6 +302,11 @@ async function cmdRun(
 }
 
 function stepLabel(step: import('./types.js').Step): string {
+  if (step.type === 'comment') {
+    const target = step.locator ? ` ${step.locator.strategy}=${step.locator.value}` : '';
+    const note = step.note ? ` "${step.note}"` : '';
+    return `${step.type}${target}${note}`;
+  }
   if (step.locator) return `${step.type} ${step.locator.strategy}=${step.locator.value}`;
   if (step.url) return `${step.type} ${step.url}`;
   if (step.text) return `${step.type} "${step.text}"`;

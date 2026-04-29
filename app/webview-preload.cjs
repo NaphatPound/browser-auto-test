@@ -1,6 +1,10 @@
 const { ipcRenderer } = require('electron');
 
 const DEFAULT_ATTRS = ['data-testid', 'id', 'name', 'aria-label', 'role', 'type', 'placeholder'];
+const RUNTIME_EVENT = '__auto_test_runtime_issue__';
+
+let pickMode = false;
+let pickHoverEl = null;
 
 function cssPath(el) {
   const parts = [];
@@ -139,9 +143,61 @@ function send(step) {
   ipcRenderer.sendToHost('recorder:step', step);
 }
 
+function sendRuntimeIssue(kind, payload) {
+  ipcRenderer.sendToHost('telemetry:issue', { kind, payload });
+}
+
+function clearPickHover() {
+  if (!pickHoverEl) return;
+  pickHoverEl.style.outline = pickHoverEl.__autoTestPrevOutline || '';
+  pickHoverEl.style.outlineOffset = pickHoverEl.__autoTestPrevOutlineOffset || '';
+  pickHoverEl = null;
+}
+
+function setPickHover(el) {
+  if (pickHoverEl === el) return;
+  clearPickHover();
+  if (!el || !el.style) return;
+  pickHoverEl = el;
+  pickHoverEl.__autoTestPrevOutline = pickHoverEl.style.outline;
+  pickHoverEl.__autoTestPrevOutlineOffset = pickHoverEl.style.outlineOffset;
+  pickHoverEl.style.outline = '2px solid #2563eb';
+  pickHoverEl.style.outlineOffset = '2px';
+}
+
+function setPickMode(value) {
+  pickMode = !!value;
+  document.documentElement.style.cursor = pickMode ? 'crosshair' : '';
+  if (!pickMode) clearPickHover();
+}
+
+ipcRenderer.on('inspector:pick-mode', (_e, value) => {
+  setPickMode(value);
+});
+
+document.addEventListener(
+  'mousemove',
+  (ev) => {
+    if (!pickMode) return;
+    setPickHover(resolveInteractive(ev) || resolveTarget(ev));
+  },
+  true,
+);
+
 document.addEventListener(
   'click',
   (ev) => {
+    if (pickMode) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation();
+      const t = resolveInteractive(ev) || resolveTarget(ev);
+      if (t) {
+        ipcRenderer.sendToHost('inspector:pick-element', { target: extractCandidate(t) });
+      }
+      setPickMode(false);
+      return;
+    }
     const t = resolveInteractive(ev);
     if (!t) return;
     if (t.tagName === 'INPUT') {
@@ -162,6 +218,7 @@ document.addEventListener(
 document.addEventListener(
   'input',
   (ev) => {
+    if (pickMode) return;
     const t = resolveInteractive(ev);
     if (!t || !isEditable(t)) return;
     send({ type: 'fill', target: extractCandidate(t), text: readEditableValue(t) });
@@ -172,6 +229,7 @@ document.addEventListener(
 document.addEventListener(
   'change',
   (ev) => {
+    if (pickMode) return;
     const t = resolveInteractive(ev);
     if (!t) return;
     if (t.tagName === 'SELECT') {
@@ -184,6 +242,15 @@ document.addEventListener(
 document.addEventListener(
   'keydown',
   (ev) => {
+    if (pickMode && ev.key === 'Escape') {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation();
+      setPickMode(false);
+      ipcRenderer.sendToHost('inspector:pick-cancelled');
+      return;
+    }
+    if (pickMode) return;
     if (ev.key !== 'Enter' && ev.key !== 'Tab' && ev.key !== 'Escape') return;
     const t = resolveInteractive(ev);
     if (!t) return;
@@ -191,3 +258,153 @@ document.addEventListener(
   },
   true,
 );
+
+window.addEventListener(
+  RUNTIME_EVENT,
+  (ev) => {
+    if (!ev || !ev.detail || !ev.detail.kind) return;
+    sendRuntimeIssue(ev.detail.kind, ev.detail.payload || {});
+  },
+  true,
+);
+
+window.addEventListener(
+  'error',
+  (ev) => {
+    const target = ev.target;
+    if (target && target !== window && target.nodeType === 1) {
+      const url = target.currentSrc || target.src || target.href || '';
+      sendRuntimeIssue('network', {
+        source: 'resource',
+        url,
+        resourceType: target.tagName ? target.tagName.toLowerCase() : 'resource',
+        error: 'resource failed to load',
+      });
+      return;
+    }
+    const source = ev.filename
+      ? `${ev.filename}:${ev.lineno || 0}:${ev.colno || 0}`
+      : 'window.error';
+    sendRuntimeIssue('page', {
+      message: ev.message || 'Script error',
+      source,
+      stack: ev.error && ev.error.stack ? ev.error.stack : undefined,
+    });
+  },
+  true,
+);
+
+window.addEventListener(
+  'unhandledrejection',
+  (ev) => {
+    const reason = ev.reason;
+    const message = typeof reason === 'string'
+      ? reason
+      : reason && reason.message
+        ? reason.message
+        : String(reason);
+    sendRuntimeIssue('page', {
+      message,
+      source: 'unhandledrejection',
+      stack: reason && reason.stack ? reason.stack : undefined,
+    });
+  },
+  true,
+);
+
+function injectRuntimeProbe() {
+  const source = `
+    (function () {
+      if (window.__AUTO_TEST_RUNTIME_MONITOR__) return;
+      window.__AUTO_TEST_RUNTIME_MONITOR__ = true;
+      var eventName = ${JSON.stringify(RUNTIME_EVENT)};
+      function emit(kind, payload) {
+        window.dispatchEvent(new CustomEvent(eventName, { detail: { kind: kind, payload: payload } }));
+      }
+      if (typeof window.fetch === 'function') {
+        var origFetch = window.fetch;
+        window.fetch = function () {
+          var args = Array.prototype.slice.call(arguments);
+          var input = args[0];
+          var init = args[1] || {};
+          var url = typeof input === 'string' ? input : (input && input.url) || '';
+          var method = init.method || (input && input.method) || 'GET';
+          return origFetch.apply(this, args).then(function (response) {
+            if (!response.ok) {
+              emit('network', {
+                source: 'fetch',
+                url: response.url || url,
+                method: method,
+                status: response.status,
+                statusText: response.statusText
+              });
+            }
+            return response;
+          }).catch(function (error) {
+            emit('network', {
+              source: 'fetch',
+              url: url,
+              method: method,
+              error: String(error && error.message || error)
+            });
+            throw error;
+          });
+        };
+      }
+      if (window.XMLHttpRequest && window.XMLHttpRequest.prototype) {
+        var open = window.XMLHttpRequest.prototype.open;
+        var send = window.XMLHttpRequest.prototype.send;
+        window.XMLHttpRequest.prototype.open = function (method, url) {
+          this.__autoTestReq = { method: method || 'GET', url: String(url || '') };
+          return open.apply(this, arguments);
+        };
+        window.XMLHttpRequest.prototype.send = function () {
+          var xhr = this;
+          var meta = xhr.__autoTestReq || { method: 'GET', url: '' };
+          xhr.addEventListener('loadend', function onLoadEnd() {
+            if (xhr.status >= 400) {
+              emit('network', {
+                source: 'xhr',
+                url: xhr.responseURL || meta.url,
+                method: meta.method,
+                status: xhr.status,
+                statusText: xhr.statusText
+              });
+            }
+          }, { once: true });
+          xhr.addEventListener('error', function onError() {
+            emit('network', {
+              source: 'xhr',
+              url: xhr.responseURL || meta.url,
+              method: meta.method,
+              error: 'XMLHttpRequest failed'
+            });
+          }, { once: true });
+          return send.apply(this, arguments);
+        };
+      }
+    })();
+  `;
+
+  const inject = () => {
+    const root = document.documentElement || document.head || document.body;
+    if (!root) return false;
+    const script = document.createElement('script');
+    script.textContent = source;
+    root.appendChild(script);
+    script.remove();
+    return true;
+  };
+
+  if (!inject()) {
+    document.addEventListener(
+      'readystatechange',
+      () => {
+        inject();
+      },
+      { once: true },
+    );
+  }
+}
+
+injectRuntimeProbe();
