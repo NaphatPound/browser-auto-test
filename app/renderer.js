@@ -739,26 +739,148 @@ btnBack.addEventListener('click', () => wv.canGoBack() && wv.goBack());
 btnForward.addEventListener('click', () => wv.canGoForward() && wv.goForward());
 btnReload.addEventListener('click', () => wv.reload());
 
+// ---------- Bottom-docked DevTools panel ----------
 const btnDevtools = document.getElementById('btn-devtools');
-function toggleWebviewDevTools() {
-  if (!wv) return;
-  try {
-    if (typeof wv.isDevToolsOpened === 'function' && wv.isDevToolsOpened()) {
-      wv.closeDevTools();
-    } else if (typeof wv.openDevTools === 'function') {
-      wv.openDevTools();
-    }
-  } catch (e) {
-    logEntry('err', `DevTools toggle failed: ${(e && e.message) || e}`);
-  }
+const bottomDevtools = document.getElementById('bottom-devtools');
+const devtoolsResizer = document.getElementById('devtools-resizer');
+const devtoolsConsoleEl = document.getElementById('devtools-console');
+const devtoolsNetworkEl = document.getElementById('devtools-network');
+const btnDevtoolsClear = document.getElementById('btn-devtools-clear');
+const btnDevtoolsClose = document.getElementById('btn-devtools-close');
+const devtoolsTabBtns = document.querySelectorAll('.devtools-tab');
+const devtoolsPanes = document.querySelectorAll('.devtools-pane');
+
+const DEVTOOLS_HEIGHT_KEY = 'autoTestRecorder.devtoolsHeight.v1';
+const DEVTOOLS_MAX_ITEMS = 500;
+let devtoolsActiveTab = 'console';
+
+function fmtDtTime(ts) {
+  const d = new Date(ts);
+  return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
-if (btnDevtools) btnDevtools.addEventListener('click', toggleWebviewDevTools);
+
+function trimList(listEl) {
+  while (listEl.children.length > DEVTOOLS_MAX_ITEMS) listEl.removeChild(listEl.firstChild);
+}
+
+function appendConsoleEntry(entry) {
+  if (!devtoolsConsoleEl) return;
+  const li = document.createElement('li');
+  li.className = entry.level || 'log';
+  const ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = fmtDtTime(entry.ts);
+  const lvl = document.createElement('span');
+  lvl.className = 'lvl';
+  lvl.textContent = entry.level;
+  const msg = document.createElement('span');
+  msg.className = 'msg';
+  let text = entry.message || '';
+  if (entry.sourceId) {
+    const where = entry.line ? `${entry.sourceId}:${entry.line}` : entry.sourceId;
+    text += `  (${where})`;
+  }
+  msg.textContent = text;
+  li.appendChild(ts);
+  li.appendChild(lvl);
+  li.appendChild(msg);
+  devtoolsConsoleEl.appendChild(li);
+  trimList(devtoolsConsoleEl);
+  if (devtoolsActiveTab === 'console') devtoolsConsoleEl.scrollTop = devtoolsConsoleEl.scrollHeight;
+}
+
+function appendNetworkEntry(entry) {
+  if (!devtoolsNetworkEl) return;
+  const li = document.createElement('li');
+  if (!entry.ok) li.classList.add('bad');
+  const ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = fmtDtTime(entry.ts);
+  const method = document.createElement('span');
+  method.className = 'method';
+  method.textContent = entry.method || 'GET';
+  const status = document.createElement('span');
+  status.className = 'status';
+  status.textContent = entry.status ? String(entry.status) : (entry.error ? 'ERR' : '—');
+  const dur = document.createElement('span');
+  dur.className = 'dur';
+  dur.textContent = Number.isFinite(entry.durationMs) ? `${entry.durationMs}ms` : '';
+  const url = document.createElement('span');
+  url.className = 'url';
+  url.textContent = entry.url || '';
+  if (entry.error) url.textContent += `  — ${entry.error}`;
+  li.appendChild(ts);
+  li.appendChild(method);
+  li.appendChild(status);
+  li.appendChild(dur);
+  li.appendChild(url);
+  devtoolsNetworkEl.appendChild(li);
+  trimList(devtoolsNetworkEl);
+  if (devtoolsActiveTab === 'network') devtoolsNetworkEl.scrollTop = devtoolsNetworkEl.scrollHeight;
+}
+
+function setDevtoolsTab(tab) {
+  devtoolsActiveTab = tab;
+  devtoolsTabBtns.forEach((b) => b.classList.toggle('active', b.dataset.dtTab === tab));
+  devtoolsPanes.forEach((p) => { p.hidden = p.dataset.dtPane !== tab; });
+}
+
+function toggleBottomDevtools() {
+  if (!bottomDevtools) return;
+  bottomDevtools.hidden = !bottomDevtools.hidden;
+}
+
+devtoolsTabBtns.forEach((b) => {
+  b.addEventListener('click', () => setDevtoolsTab(b.dataset.dtTab));
+});
+
+if (btnDevtools) btnDevtools.addEventListener('click', toggleBottomDevtools);
+if (btnDevtoolsClose) btnDevtoolsClose.addEventListener('click', () => { if (bottomDevtools) bottomDevtools.hidden = true; });
+if (btnDevtoolsClear) btnDevtoolsClear.addEventListener('click', () => {
+  if (devtoolsActiveTab === 'console' && devtoolsConsoleEl) devtoolsConsoleEl.innerHTML = '';
+  if (devtoolsActiveTab === 'network' && devtoolsNetworkEl) devtoolsNetworkEl.innerHTML = '';
+});
+
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'F12') {
     ev.preventDefault();
-    toggleWebviewDevTools();
+    toggleBottomDevtools();
   }
 });
+
+// Resizable height — drag the top edge of the panel.
+if (devtoolsResizer && bottomDevtools) {
+  let drag = false;
+  let startY = 0;
+  let startH = 280;
+  const onMove = (ev) => {
+    if (!drag) return;
+    const dy = startY - ev.clientY; // moving up grows the panel
+    const h = Math.max(140, Math.min(window.innerHeight - 200, startH + dy));
+    bottomDevtools.style.height = h + 'px';
+  };
+  const onUp = () => {
+    if (!drag) return;
+    drag = false;
+    if (appRoot) appRoot.classList.remove('dt-resizing');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    try { localStorage.setItem(DEVTOOLS_HEIGHT_KEY, parseInt(bottomDevtools.style.height || '280', 10) + ''); } catch {}
+  };
+  devtoolsResizer.addEventListener('mousedown', (ev) => {
+    ev.preventDefault();
+    drag = true;
+    startY = ev.clientY;
+    startH = bottomDevtools.offsetHeight || 280;
+    if (appRoot) appRoot.classList.add('dt-resizing');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+try {
+  const saved = parseInt(localStorage.getItem(DEVTOOLS_HEIGHT_KEY) || '', 10);
+  if (Number.isFinite(saved) && bottomDevtools) bottomDevtools.style.height = saved + 'px';
+} catch {}
 
 tabs.forEach((t) => {
   t.addEventListener('click', () => {
@@ -853,6 +975,15 @@ wv.addEventListener('did-navigate-in-page', (e) => {
 
 wv.addEventListener('console-message', (ev) => {
   const level = CONSOLE_LEVELS[ev.level] || 'log';
+  // Show every console message in the docked DevTools panel — like Chrome.
+  appendConsoleEntry({
+    ts: Date.now(),
+    level,
+    message: ev.message,
+    sourceId: ev.sourceId,
+    line: ev.line,
+  });
+  // But only treat warnings/errors as "issues" for the bug report.
   if (level !== 'warning' && level !== 'error') return;
   handleRuntimeIssue('console', {
     level,
@@ -883,6 +1014,12 @@ wv.addEventListener('ipc-message', (ev) => {
   }
   if (ev.channel === 'telemetry:issue') {
     const raw = ev.args[0] || {};
+    if (raw.kind === 'net') {
+      // Live network trace for the docked DevTools panel — every fetch/XHR
+      // gets a row regardless of success.
+      appendNetworkEntry({ ts: Date.now(), ...(raw.payload || {}) });
+      return;
+    }
     handleRuntimeIssue(raw.kind, raw.payload || {});
     return;
   }

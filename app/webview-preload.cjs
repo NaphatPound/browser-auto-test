@@ -329,7 +329,18 @@ function injectRuntimeProbe() {
           var init = args[1] || {};
           var url = typeof input === 'string' ? input : (input && input.url) || '';
           var method = init.method || (input && input.method) || 'GET';
+          var startTs = Date.now();
           return origFetch.apply(this, args).then(function (response) {
+            var trace = {
+              source: 'fetch',
+              url: response.url || url,
+              method: method,
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok,
+              durationMs: Date.now() - startTs
+            };
+            emit('net', trace);
             if (!response.ok) {
               emit('network', {
                 source: 'fetch',
@@ -341,11 +352,20 @@ function injectRuntimeProbe() {
             }
             return response;
           }).catch(function (error) {
+            var msg = String(error && error.message || error);
+            emit('net', {
+              source: 'fetch',
+              url: url,
+              method: method,
+              ok: false,
+              error: msg,
+              durationMs: Date.now() - startTs
+            });
             emit('network', {
               source: 'fetch',
               url: url,
               method: method,
-              error: String(error && error.message || error)
+              error: msg
             });
             throw error;
           });
@@ -361,7 +381,17 @@ function injectRuntimeProbe() {
         window.XMLHttpRequest.prototype.send = function () {
           var xhr = this;
           var meta = xhr.__autoTestReq || { method: 'GET', url: '' };
+          var startTs = Date.now();
           xhr.addEventListener('loadend', function onLoadEnd() {
+            emit('net', {
+              source: 'xhr',
+              url: xhr.responseURL || meta.url,
+              method: meta.method,
+              status: xhr.status,
+              statusText: xhr.statusText,
+              ok: xhr.status >= 200 && xhr.status < 400,
+              durationMs: Date.now() - startTs
+            });
             if (xhr.status >= 400) {
               emit('network', {
                 source: 'xhr',

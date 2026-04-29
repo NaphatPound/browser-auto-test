@@ -101,6 +101,23 @@
           preload="./webview-preload.cjs"
           allowpopups
         ></webview>
+
+        <div id="bottom-devtools" class="bottom-devtools" hidden>
+          <div class="devtools-resizer" id="devtools-resizer" title="Drag to resize"></div>
+          <div class="devtools-tabs">
+            <button class="devtools-tab active" data-dt-tab="console" type="button">Console</button>
+            <button class="devtools-tab" data-dt-tab="network" type="button">Network</button>
+            <span class="devtools-spacer"></span>
+            <button id="btn-devtools-clear" class="btn" type="button">Clear</button>
+            <button id="btn-devtools-close" class="btn" type="button" title="Close (F12)">×</button>
+          </div>
+          <div class="devtools-pane" data-dt-pane="console">
+            <ol id="devtools-console" class="devtools-list"></ol>
+          </div>
+          <div class="devtools-pane" data-dt-pane="network" hidden>
+            <ol id="devtools-network" class="devtools-list devtools-list-network"></ol>
+          </div>
+        </div>
       </main>
     </div>
 
