@@ -10,15 +10,26 @@ html, body, #app {
 
 #app {
   --panel-width: 420px;
+  --terminal-width: 520px;
   display: grid;
-  grid-template-columns: var(--panel-width) 6px 1fr;
+  grid-template-columns: var(--panel-width) 6px 1fr 6px var(--terminal-width);
   height: 100vh;
 }
 #app.panel-hidden {
+  grid-template-columns: 1fr 6px var(--terminal-width);
+}
+#app.terminal-hidden {
+  grid-template-columns: var(--panel-width) 6px 1fr;
+}
+#app.panel-hidden.terminal-hidden {
   grid-template-columns: 1fr;
 }
 #app.panel-hidden #panel,
 #app.panel-hidden #panel-resizer {
+  display: none;
+}
+#app.terminal-hidden #terminal-panel,
+#app.terminal-hidden #terminal-resizer {
   display: none;
 }
 .panel-resizer {
@@ -641,6 +652,128 @@ webview {
   text-align: center;
   color: #64748b;
   font-style: italic;
+}
+
+/* ---------- Terminal panel (right) ---------- */
+.terminal-panel {
+  background: #0f172a;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #334155;
+}
+.term-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+.term-header h2 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+.term-collapse {
+  background: #334155 !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+  padding: 0 10px !important;
+  font-size: 14px !important;
+  line-height: 22px;
+}
+.term-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+.term-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.term-row .btn {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+  font-size: 11px;
+  padding: 3px 10px;
+}
+.term-row .btn:hover:not(:disabled) {
+  background: #475569;
+}
+#term-cwd {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+}
+#term-cwd:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+.term-cwd-display {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.term-host {
+  flex: 1;
+  overflow: hidden;
+  padding: 6px;
+  background: #0f172a;
+}
+.term-host .xterm {
+  height: 100%;
+  width: 100%;
+}
+.term-host .xterm-viewport {
+  background: transparent !important;
+}
+
+/* Right-edge toggle for terminal panel */
+.panel-resizer-right {
+  background: #1e293b;
+}
+.panel-resizer-right::before {
+  background: #94a3b8;
+}
+.panel-resizer-right:hover,
+.panel-resizer-right.dragging {
+  background: #3b82f6;
+}
+
+/* Floating "Show Terminal" button when right panel is hidden */
+#btn-toggle-terminal {
+  font-size: 11px;
+  padding: 4px 10px;
+  font-weight: 600;
+}
+#app.terminal-hidden #btn-toggle-terminal {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #1e293b;
+}
+#app.terminal-hidden #btn-toggle-terminal:hover {
+  background: #1e293b;
 }
 
 .modal-body-light {

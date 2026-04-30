@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <title>Auto-Test Browser</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
   </head>
   <body>
     <div id="app">
@@ -94,6 +97,7 @@
           </form>
           <button id="btn-go" class="nav">Go</button>
           <button id="btn-devtools" class="nav" title="Open DevTools (F12)">F12</button>
+          <button id="btn-toggle-terminal" class="nav nav-toggle-right" title="Hide/Show terminal panel">Terminal ▶</button>
         </div>
         <webview
           id="wv"
@@ -119,6 +123,28 @@
           </div>
         </div>
       </main>
+
+      <div id="terminal-resizer" class="panel-resizer panel-resizer-right" title="Drag to resize terminal"></div>
+
+      <aside id="terminal-panel" class="terminal-panel">
+        <header class="term-header">
+          <h2>Claude Code Terminal</h2>
+          <button id="btn-terminal-collapse" class="btn term-collapse" type="button" title="Hide terminal">×</button>
+        </header>
+        <div class="term-controls">
+          <div class="term-row">
+            <input id="term-cwd" type="text" placeholder="Working directory (project folder)" />
+            <button id="btn-term-pick" class="btn" type="button" title="Browse">📁</button>
+            <button id="btn-term-restart" class="btn" type="button" title="Open / restart shell in this directory">Open</button>
+          </div>
+          <div class="term-row">
+            <button id="btn-term-claude" class="btn" type="button" title="Type 'claude' to start Claude Code">Start claude</button>
+            <button id="btn-term-clear" class="btn" type="button">Clear</button>
+            <span class="term-cwd-display" id="term-cwd-display"></span>
+          </div>
+        </div>
+        <div id="term-host" class="term-host"></div>
+      </aside>
     </div>
 
     <div id="sessions-modal" class="modal" hidden>
@@ -162,6 +188,7 @@
           <span id="report-preview-meta" class="modal-meta"></span>
           <span class="modal-spacer"></span>
           <button id="btn-report-copy" class="btn" type="button">Copy</button>
+          <button id="btn-report-send-claude" class="btn" type="button" title="Send this report into the terminal so Claude Code can read it">Send to Claude</button>
           <button id="btn-report-download" class="btn primary" type="button">Download report.md</button>
         </footer>
       </div>

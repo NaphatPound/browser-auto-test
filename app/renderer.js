@@ -882,6 +882,232 @@ try {
   if (Number.isFinite(saved) && bottomDevtools) bottomDevtools.style.height = saved + 'px';
 } catch {}
 
+// ---------- Right terminal panel ----------
+const TERMINAL_HIDDEN_KEY = 'autoTestRecorder.terminalHidden.v1';
+const TERMINAL_WIDTH_KEY = 'autoTestRecorder.terminalWidth.v1';
+const TERMINAL_CWD_KEY = 'autoTestRecorder.terminalCwd.v1';
+const btnToggleTerminal = document.getElementById('btn-toggle-terminal');
+const btnTerminalCollapse = document.getElementById('btn-terminal-collapse');
+const terminalResizer = document.getElementById('terminal-resizer');
+const termHostEl = document.getElementById('term-host');
+const termCwdInput = document.getElementById('term-cwd');
+const termCwdDisplay = document.getElementById('term-cwd-display');
+const btnTermPick = document.getElementById('btn-term-pick');
+const btnTermRestart = document.getElementById('btn-term-restart');
+const btnTermClaude = document.getElementById('btn-term-claude');
+const btnTermClear = document.getElementById('btn-term-clear');
+
+let xtermInstance = null;
+let fitAddon = null;
+let activeTerminalId = null;
+let terminalDataUnsub = null;
+let terminalExitUnsub = null;
+
+function setTerminalHidden(hidden) {
+  if (!appRoot) return;
+  appRoot.classList.toggle('terminal-hidden', hidden);
+  if (btnToggleTerminal) {
+    btnToggleTerminal.title = hidden ? 'Show terminal panel' : 'Hide terminal panel';
+    btnToggleTerminal.textContent = hidden ? '◀ Terminal' : 'Terminal ▶';
+  }
+  try { localStorage.setItem(TERMINAL_HIDDEN_KEY, hidden ? '1' : '0'); } catch {}
+  // Refit the xterm display to the new container size after the layout settles.
+  if (!hidden && xtermInstance) {
+    requestAnimationFrame(() => fitTerminal());
+  }
+}
+
+function fitTerminal() {
+  if (!fitAddon || !xtermInstance) return;
+  try {
+    fitAddon.fit();
+    if (activeTerminalId && window.terminalAPI) {
+      const { cols, rows } = xtermInstance;
+      window.terminalAPI.resize(activeTerminalId, cols, rows);
+    }
+  } catch {}
+}
+
+async function ensureTerminal(cwd) {
+  if (!window.terminalAPI) {
+    if (termCwdDisplay) termCwdDisplay.textContent = '⚠ terminal disabled (run npm install)';
+    return;
+  }
+  if (!xtermInstance) {
+    xtermInstance = new window.Terminal({
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+      fontSize: 12,
+      lineHeight: 1.2,
+      cursorBlink: true,
+      theme: { background: '#0f172a', foreground: '#e2e8f0', cursor: '#e2e8f0' },
+      scrollback: 5000,
+      convertEol: false,
+    });
+    fitAddon = new window.FitAddon.FitAddon();
+    xtermInstance.loadAddon(fitAddon);
+    xtermInstance.open(termHostEl);
+    fitTerminal();
+    xtermInstance.onData((data) => {
+      if (activeTerminalId) window.terminalAPI.write(activeTerminalId, data);
+    });
+    terminalDataUnsub = window.terminalAPI.onData(({ id, data }) => {
+      if (id !== activeTerminalId) return;
+      xtermInstance.write(data);
+    });
+    terminalExitUnsub = window.terminalAPI.onExit(({ id, exitCode }) => {
+      if (id !== activeTerminalId) return;
+      xtermInstance.writeln(`\x1b[33m\r\n[shell exited with code ${exitCode}]\x1b[0m`);
+      activeTerminalId = null;
+    });
+    window.addEventListener('resize', fitTerminal);
+  }
+
+  // Kill prior session if any (Open in a new directory restarts the shell).
+  if (activeTerminalId) {
+    try { await window.terminalAPI.kill(activeTerminalId); } catch {}
+    activeTerminalId = null;
+  }
+
+  const targetCwd = (cwd && cwd.trim()) || (await window.terminalAPI.defaultCwd());
+  const { cols, rows } = xtermInstance;
+  const res = await window.terminalAPI.create({ cwd: targetCwd, cols, rows });
+  if (!res || !res.ok) {
+    xtermInstance.writeln(`\x1b[31m[failed to start shell: ${(res && res.error) || 'unknown error'}]\x1b[0m`);
+    return;
+  }
+  activeTerminalId = res.id;
+  if (termCwdInput) termCwdInput.value = res.cwd;
+  if (termCwdDisplay) termCwdDisplay.textContent = res.cwd;
+  try { localStorage.setItem(TERMINAL_CWD_KEY, res.cwd); } catch {}
+  xtermInstance.focus();
+}
+
+if (btnToggleTerminal) {
+  btnToggleTerminal.addEventListener('click', async () => {
+    const isHidden = appRoot && appRoot.classList.contains('terminal-hidden');
+    setTerminalHidden(!isHidden);
+    if (!isHidden) return; // we just hid it
+    // Lazy-create the terminal the first time it's shown.
+    if (!xtermInstance) {
+      const savedCwd = (() => { try { return localStorage.getItem(TERMINAL_CWD_KEY) || ''; } catch { return ''; } })();
+      await ensureTerminal(savedCwd);
+    }
+  });
+}
+
+if (btnTerminalCollapse) {
+  btnTerminalCollapse.addEventListener('click', () => setTerminalHidden(true));
+}
+
+if (btnTermRestart) {
+  btnTermRestart.addEventListener('click', async () => {
+    const cwd = termCwdInput ? termCwdInput.value.trim() : '';
+    await ensureTerminal(cwd);
+  });
+}
+
+if (btnTermPick) {
+  btnTermPick.addEventListener('click', async () => {
+    if (!window.terminalAPI) return;
+    const res = await window.terminalAPI.pickDirectory();
+    if (res && res.ok && res.path && termCwdInput) {
+      termCwdInput.value = res.path;
+    }
+  });
+}
+
+if (btnTermClaude) {
+  btnTermClaude.addEventListener('click', () => {
+    if (!activeTerminalId || !window.terminalAPI) return;
+    window.terminalAPI.write(activeTerminalId, 'claude\r');
+  });
+}
+
+if (btnTermClear) {
+  btnTermClear.addEventListener('click', () => {
+    if (xtermInstance) xtermInstance.clear();
+  });
+}
+
+// Resize the terminal panel by dragging its left edge.
+if (terminalResizer && appRoot) {
+  let drag = false;
+  let startX = 0;
+  let startWidth = 0;
+  const onMove = (ev) => {
+    if (!drag) return;
+    const dx = startX - ev.clientX; // moving left grows the terminal
+    const next = Math.max(320, Math.min(1100, startWidth + dx));
+    appRoot.style.setProperty('--terminal-width', next + 'px');
+    fitTerminal();
+  };
+  const onUp = () => {
+    if (!drag) return;
+    drag = false;
+    if (appRoot) appRoot.classList.remove('resizing');
+    terminalResizer.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    try {
+      const cur = getComputedStyle(appRoot).getPropertyValue('--terminal-width').trim();
+      const px = parseInt(cur, 10);
+      if (Number.isFinite(px)) localStorage.setItem(TERMINAL_WIDTH_KEY, String(px));
+    } catch {}
+    fitTerminal();
+  };
+  terminalResizer.addEventListener('mousedown', (ev) => {
+    ev.preventDefault();
+    drag = true;
+    startX = ev.clientX;
+    const cur = getComputedStyle(appRoot).getPropertyValue('--terminal-width').trim();
+    startWidth = parseInt(cur, 10) || 520;
+    if (appRoot) appRoot.classList.add('resizing');
+    terminalResizer.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+try {
+  const savedW = parseInt(localStorage.getItem(TERMINAL_WIDTH_KEY) || '', 10);
+  if (Number.isFinite(savedW) && appRoot) appRoot.style.setProperty('--terminal-width', savedW + 'px');
+} catch {}
+try {
+  if (localStorage.getItem(TERMINAL_HIDDEN_KEY) === '1') setTerminalHidden(true);
+  else setTerminalHidden(false);
+} catch {}
+
+// Send the report markdown into the active terminal so Claude Code can read it.
+function sendReportToClaude(md) {
+  if (!md) return false;
+  if (!activeTerminalId || !window.terminalAPI) {
+    alert('Open the terminal first (click the Terminal ▶ button), set the working directory, and run "claude" inside it.');
+    return false;
+  }
+  // Wrap the report with a clear instruction so Claude Code knows what to do.
+  const prefix = 'Please review this bug report and fix the issues described:\n\n';
+  const payload = prefix + md + '\n';
+  // PTY input: convert any plain newlines to CR; xterm.js / shells expect \r.
+  const normalized = payload.replace(/\r?\n/g, '\r');
+  window.terminalAPI.write(activeTerminalId, normalized);
+  return true;
+}
+
+const btnReportSendClaude = document.getElementById('btn-report-send-claude');
+if (btnReportSendClaude) {
+  btnReportSendClaude.addEventListener('click', () => {
+    const md = reportPreview ? reportPreview.textContent : '';
+    if (!md) return;
+    if (sendReportToClaude(md)) {
+      btnReportSendClaude.textContent = 'Sent ✓';
+      setTimeout(() => { btnReportSendClaude.textContent = 'Send to Claude'; }, 1500);
+      // Make sure terminal is visible after sending.
+      if (appRoot && appRoot.classList.contains('terminal-hidden')) setTerminalHidden(false);
+      closeReportPreview();
+    }
+  });
+}
+
 tabs.forEach((t) => {
   t.addEventListener('click', () => {
     tabs.forEach((x) => x.classList.remove('active'));
