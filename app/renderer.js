@@ -6,6 +6,7 @@ import {
   locatorLabel,
 } from './report-utils.js';
 
+const appRoot = document.getElementById('app');
 const wv = document.getElementById('wv');
 const urlInput = document.getElementById('url');
 const urlForm = document.getElementById('url-form');
@@ -2031,7 +2032,6 @@ document.addEventListener('keydown', (ev) => {
 
 // ---------- Panel toggle ----------
 const PANEL_HIDDEN_KEY = 'autoTestRecorder.panelHidden.v1';
-const appRoot = document.getElementById('app');
 const btnTogglePanel = document.getElementById('btn-toggle-panel');
 
 function setPanelHidden(hidden) {
