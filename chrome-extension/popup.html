@@ -12,17 +12,80 @@
     </header>
 
     <section class="controls">
-      <button id="btn-start" class="btn primary">● Start</button>
-      <button id="btn-stop" class="btn" disabled>■ Stop</button>
-      <button id="btn-clear" class="btn">Clear</button>
-      <button id="btn-download" class="btn">Download JSON</button>
+      <div class="row">
+        <button id="btn-start" class="btn primary">● Record</button>
+        <button id="btn-stop" class="btn" disabled>■ Stop</button>
+        <button id="btn-comment" class="btn">Comment Element</button>
+        <button id="btn-clear" class="btn danger">Clear</button>
+      </div>
+      <div class="row">
+        <button id="btn-export-json" class="btn">Export JSON</button>
+        <button id="btn-preview-report" class="btn" disabled>Preview Report</button>
+        <button id="btn-export-report" class="btn" disabled>Export Report</button>
+        <button id="btn-sessions" class="btn">Sessions</button>
+      </div>
+    </section>
+
+    <section class="metrics">
+      <span><strong id="step-count">0</strong> steps</span>
+      <span class="dot">·</span>
+      <span><strong id="bug-count">0</strong> notes</span>
+      <span class="dot">·</span>
+      <span><strong id="issue-count">0</strong> issues</span>
     </section>
 
     <section class="steps">
-      <h2>Steps <span id="step-count">(0)</span></h2>
       <ol id="step-list"></ol>
+      <p id="empty-hint" class="empty-hint">Click ● Record on the active tab and start interacting. Use Comment Element to flag bugs.</p>
     </section>
 
+    <!-- Report preview modal -->
+    <div id="report-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card">
+        <header class="modal-header">
+          <h2>Report Preview</h2>
+          <button class="modal-close" data-close type="button">×</button>
+        </header>
+        <div class="modal-body modal-body-dark">
+          <pre id="report-preview"></pre>
+        </div>
+        <footer class="modal-footer">
+          <span id="report-meta" class="modal-meta"></span>
+          <span class="spacer"></span>
+          <button id="btn-report-copy" class="btn" type="button">Copy</button>
+          <button id="btn-report-download" class="btn primary" type="button">Download .md</button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Sessions modal -->
+    <div id="sessions-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card">
+        <header class="modal-header">
+          <h2>Saved Sessions</h2>
+          <button class="modal-close" data-close type="button">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="settings-row">
+            <label>
+              <input id="setting-new-per-recording" type="checkbox" />
+              <span>Start a new report each time I click Record (auto-archive on Stop)</span>
+            </label>
+          </div>
+          <div class="sessions-toolbar">
+            <button id="btn-session-save-now" class="btn" type="button">Save Current as Session</button>
+            <span class="spacer"></span>
+            <button id="btn-session-export-combined" class="btn" type="button" disabled>Export Combined .md</button>
+          </div>
+          <ol id="sessions-list" class="sessions-list"></ol>
+          <p id="sessions-empty" class="empty-hint">No saved sessions yet. Each Record→Stop is auto-saved here.</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="report-utils.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
